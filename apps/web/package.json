@@ -1,0 +1,10 @@
+{
+  "name": "@retrace/web",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'Day 6 scaffolds the Next.js app' && exit 0",
+    "build": "echo 'TODO Day 6' && exit 0",
+    "lint": "echo 'TODO Day 6' && exit 0"
+  }
+}
