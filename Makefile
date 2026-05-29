@@ -1,4 +1,4 @@
-.PHONY: help db-up db-down db-logs migrate-pg migrate-ch migrate seed verify reset
+.PHONY: help db-up db-down db-logs migrate-pg migrate-ch migrate seed verify reset api-dev
 
 help:
 	@echo "Targets:"
@@ -11,6 +11,7 @@ help:
 	@echo "  seed         Insert demo data and print API key"
 	@echo "  verify       Print row counts for all tables"
 	@echo "  reset        Drop volumes and start fresh (destructive)"
+	@echo "  api-dev      Run the API in reload mode on :8000"
 
 db-up:
 	docker compose up -d postgres clickhouse
@@ -30,11 +31,14 @@ migrate-ch:
 migrate: migrate-pg migrate-ch
 
 seed:
-	uv run python scripts/seed.py
+	PYTHONPATH=apps/api uv run python scripts/seed.py
 
 verify:
-	uv run python scripts/verify.py
+	PYTHONPATH=apps/api uv run python scripts/verify.py
 
 reset:
 	docker compose down -v
 	docker compose up -d postgres clickhouse
+
+api-dev:
+	cd apps/api && uv run uvicorn api.main:app --reload --host 0.0.0.0 --port 8000

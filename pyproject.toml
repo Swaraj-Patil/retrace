@@ -46,3 +46,6 @@ warn_unused_configs = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["apps/api/tests", "packages/sdk-python/tests"]
+# Make the workspace packages importable for tests without relying on
+# the editable install being healthy at the time the tests run.
+pythonpath = ["apps/api", "packages/sdk-python"]
