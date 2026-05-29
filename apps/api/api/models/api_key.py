@@ -21,9 +21,9 @@ class ApiKey(UUIDPrimaryKey, Timestamps, Base):
         index=True,
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    # First 8 chars of the raw key, kept plaintext for O(1) lookup before
-    # hash verification. Indexed unique so collisions raise loudly.
-    key_prefix: Mapped[str] = mapped_column(String(8), nullable=False, unique=True, index=True)
+    # First 11 chars of the raw key (rt_ + 8 random chars), kept plaintext for
+    # O(1) lookup before hash verification. Indexed unique so collisions raise.
+    key_prefix: Mapped[str] = mapped_column(String(11), nullable=False, unique=True, index=True)
     hashed_key: Mapped[str] = mapped_column(String(255), nullable=False)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

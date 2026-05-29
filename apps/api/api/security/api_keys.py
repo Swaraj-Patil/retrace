@@ -1,8 +1,9 @@
 """Generation, hashing and verification of project API keys.
 
 Format: ``rt_<24 bytes url-safe base64>``. The first ``KEY_PREFIX_LEN`` chars
-are stored in plaintext on the row (``key_prefix``) so lookup is O(1); the full
-key is argon2-hashed into ``hashed_key`` for verification.
+(``rt_`` + 8 chars of the random body) are stored in plaintext on the row
+(``key_prefix``) so lookup is O(1); the full key is argon2-hashed into
+``hashed_key`` for verification.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from dataclasses import dataclass
 
 from passlib.context import CryptContext
 
-KEY_PREFIX_LEN = 8
+KEY_PREFIX_LEN = 11
 _RAW_KEY_BYTES = 24
 _KEY_NAMESPACE = "rt_"
 
