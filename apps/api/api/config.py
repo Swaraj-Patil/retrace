@@ -7,8 +7,8 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Resolve to <repo-root>/.env regardless of the process CWD.
-# This file lives at apps/api/src/api/config.py (4 levels deep).
-_REPO_ROOT = Path(__file__).resolve().parents[4]
+# This file lives at apps/api/api/config.py (3 levels deep).
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 _ENV_FILE = _REPO_ROOT / ".env"
 
 

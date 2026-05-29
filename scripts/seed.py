@@ -14,18 +14,13 @@ import json
 import random
 import sys
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
-from uuid import UUID, uuid4, uuid5, NAMESPACE_DNS
+from uuid import NAMESPACE_DNS, UUID, uuid4, uuid5
 
-# Make ``src`` packages importable when running from repo root.
-REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT / "apps" / "api" / "src"))
+from sqlalchemy import delete
 
-from sqlalchemy import delete  # noqa: E402
-
-from api.clickhouse.client import get_client  # noqa: E402
-from api.db.session import SessionLocal, engine  # noqa: E402
-from api.models import (  # noqa: E402
+from api.clickhouse.client import get_client
+from api.db.session import SessionLocal, engine
+from api.models import (
     ApiKey,
     Membership,
     MembershipRole,
@@ -33,7 +28,7 @@ from api.models import (  # noqa: E402
     Project,
     User,
 )
-from api.security import generate_api_key  # noqa: E402
+from api.security import generate_api_key
 
 DEMO_ORG_SLUG = "demo"
 DEMO_USER_EMAIL = "demo@retrace.dev"

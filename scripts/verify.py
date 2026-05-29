@@ -8,15 +8,11 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT / "apps" / "api" / "src"))
+from sqlalchemy import text
 
-from sqlalchemy import text  # noqa: E402
-
-from api.clickhouse.client import get_client  # noqa: E402
-from api.db.session import SessionLocal, engine  # noqa: E402
+from api.clickhouse.client import get_client
+from api.db.session import SessionLocal, engine
 
 PG_TABLES = ["orgs", "users", "memberships", "projects", "api_keys"]
 CH_TABLES = ["traces", "retrievals", "retrieved_chunks", "citations"]
