@@ -15,6 +15,14 @@ from api.dependencies.auth import Unauthorized
 from api.logging import configure_logging
 from api.middleware import RequestIdMiddleware
 from api.routers import health as health_router
+from api.routers import ingest as ingest_router
+from api.services.ingest import (
+    BatchTooLarge,
+    PartialInsertFailure,
+    UnresolvedReferences,
+)
+
+_logger = structlog.get_logger("retrace.api")
 
 
 @asynccontextmanager
@@ -41,10 +49,43 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(RequestIdMiddleware)
     app.include_router(health_router.router)
+    app.include_router(ingest_router.router)
 
     @app.exception_handler(Unauthorized)
     async def _unauthorized_handler(_: Request, __: Unauthorized) -> JSONResponse:
         return JSONResponse(status_code=401, content={"error": "invalid_credentials"})
+
+    @app.exception_handler(BatchTooLarge)
+    async def _batch_too_large_handler(_: Request, __: BatchTooLarge) -> JSONResponse:
+        return JSONResponse(
+            status_code=413,
+            content={"error": "batch_too_large", "max_items": 1000},
+        )
+
+    @app.exception_handler(UnresolvedReferences)
+    async def _unresolved_handler(_: Request, exc: UnresolvedReferences) -> JSONResponse:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": "unresolved_references",
+                "missing": {
+                    table: sorted(str(i) for i in ids) for table, ids in exc.missing.items()
+                },
+            },
+        )
+
+    @app.exception_handler(PartialInsertFailure)
+    async def _partial_handler(request: Request, exc: PartialInsertFailure) -> JSONResponse:
+        request_id = getattr(request.state, "request_id", "unknown")
+        _logger.error(
+            "ingest.partial_insert_failure",
+            inserted=exc.inserted,
+            cause=repr(exc.__cause__) if exc.__cause__ else None,
+        )
+        return JSONResponse(
+            status_code=500,
+            content={"error": "internal_error", "request_id": request_id},
+        )
 
     return app
 
