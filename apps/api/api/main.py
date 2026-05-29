@@ -12,6 +12,7 @@ from api.config import get_settings
 from api.db.session import engine
 from api.logging import configure_logging
 from api.middleware import RequestIdMiddleware
+from api.routers import health as health_router
 
 
 @asynccontextmanager
@@ -37,6 +38,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     app.add_middleware(RequestIdMiddleware)
+    app.include_router(health_router.router)
     return app
 
 
