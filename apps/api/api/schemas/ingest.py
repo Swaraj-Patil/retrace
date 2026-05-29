@@ -11,11 +11,9 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
 
-
-class _Strict(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+from api.schemas._base import _Strict
 
 
 class TraceIn(_Strict):

@@ -16,6 +16,7 @@ from api.logging import configure_logging
 from api.middleware import RequestIdMiddleware
 from api.routers import health as health_router
 from api.routers import ingest as ingest_router
+from api.routers import projects as projects_router
 from api.services.ingest import (
     BatchTooLarge,
     PartialInsertFailure,
@@ -50,6 +51,7 @@ def create_app() -> FastAPI:
     app.add_middleware(RequestIdMiddleware)
     app.include_router(health_router.router)
     app.include_router(ingest_router.router)
+    app.include_router(projects_router.router)
 
     @app.exception_handler(Unauthorized)
     async def _unauthorized_handler(_: Request, __: Unauthorized) -> JSONResponse:
