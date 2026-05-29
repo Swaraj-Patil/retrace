@@ -11,13 +11,14 @@ from __future__ import annotations
 import secrets
 from dataclasses import dataclass
 
-from passlib.context import CryptContext
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerifyMismatchError
 
 KEY_PREFIX_LEN = 11
 _RAW_KEY_BYTES = 24
 _KEY_NAMESPACE = "rt_"
 
-_pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+_hasher = PasswordHasher()
 
 
 @dataclass(frozen=True)
@@ -38,8 +39,11 @@ def generate_api_key() -> GeneratedApiKey:
 
 
 def hash_api_key(raw_key: str) -> str:
-    return _pwd_context.hash(raw_key)
+    return _hasher.hash(raw_key)
 
 
 def verify_api_key(raw_key: str, hashed_key: str) -> bool:
-    return _pwd_context.verify(raw_key, hashed_key)
+    try:
+        return _hasher.verify(hashed_key, raw_key)
+    except (VerifyMismatchError, InvalidHashError):
+        return False
