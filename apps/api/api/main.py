@@ -6,10 +6,12 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import structlog
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from api.config import get_settings
 from api.db.session import engine
+from api.dependencies.auth import Unauthorized
 from api.logging import configure_logging
 from api.middleware import RequestIdMiddleware
 from api.routers import health as health_router
@@ -39,6 +41,11 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(RequestIdMiddleware)
     app.include_router(health_router.router)
+
+    @app.exception_handler(Unauthorized)
+    async def _unauthorized_handler(_: Request, __: Unauthorized) -> JSONResponse:
+        return JSONResponse(status_code=401, content={"error": "invalid_credentials"})
+
     return app
 
 
