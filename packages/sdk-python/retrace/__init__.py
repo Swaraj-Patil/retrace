@@ -1,9 +1,9 @@
 """Retrace Python SDK - public surface.
 
-Today: ``init()`` wires up config, the background runtime, an HTTP
-client, and the async batch sender. ``flush()`` forces an immediate
-send; ``shutdown()`` drains and tears down. OpenAI auto-instrumentation
-lands in commit 3.
+``init()`` wires up config, the background runtime, an HTTP client,
+the async batch sender, and (if ``openai`` is importable) the sync
+``chat.completions.create`` monkey-patch. ``flush()`` forces an
+immediate send; ``shutdown()`` drains and tears down.
 
 ``_configure_for_testing(transport=...)`` is the seam used by the
 integration test (commit 4) to drive the SDK against an in-process
@@ -29,7 +29,9 @@ from retrace._config import (
     set_config,
 )
 from retrace._logging import get_logger
+from retrace._models import TraceEvent
 from retrace._runtime import get_runtime
+from retrace.instrumentation import _openai as _openai_instr
 
 __version__ = "0.0.1"
 
@@ -78,10 +80,34 @@ def init(
             except Exception:
                 _log.warning("retrace: error starting batch sender", exc_info=True)
                 _sender = None
+        if cfg.enabled:
+            # Idempotent; silent no-op if openai isn't installed.
+            try:
+                _openai_instr.install()
+            except Exception:
+                _log.warning("retrace: openai instrumentation failed", exc_info=True)
         if not _atexit_registered:
             atexit.register(_atexit_shutdown)
             _atexit_registered = True
     return cfg
+
+
+def _enqueue_event(event: TraceEvent) -> None:
+    """Submit a trace event to the background sender. Non-blocking.
+
+    Called from sync user-code paths (the OpenAI wrapper). Fails silently:
+    if the SDK isn't initialized or the runtime isn't up, drop the event.
+    """
+    sender = _sender
+    if sender is None:
+        return
+    runtime = get_runtime()
+    if not runtime.is_running():
+        return
+    try:
+        runtime.submit(sender.enqueue(event))
+    except Exception:
+        _log.warning("retrace: failed to submit event", exc_info=True)
 
 
 async def _build_and_start_sender(cfg: SdkConfig) -> AsyncBatchSender:
@@ -115,7 +141,7 @@ def flush(timeout: float = 30.0) -> None:
 
 
 def shutdown() -> None:
-    """Flush remaining events and stop the background runtime."""
+    """Flush remaining events, stop the runtime, and undo openai patching."""
     global _sender
     sender = _sender
     runtime = get_runtime()
@@ -127,6 +153,10 @@ def shutdown() -> None:
             _log.warning("retrace: error during shutdown", exc_info=True)
     _sender = None
     runtime.stop()
+    try:
+        _openai_instr.uninstall()
+    except Exception:
+        _log.warning("retrace: error uninstalling openai patch", exc_info=True)
 
 
 def _atexit_shutdown() -> None:
