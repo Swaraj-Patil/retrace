@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -300,9 +301,224 @@ def _safe_json(value: Any) -> dict[str, Any]:
     return parsed if isinstance(parsed, dict) else {}
 
 
+async def metrics_overview(
+    ch: Client,
+    *,
+    project_id: UUID,
+    start_from: datetime | None,
+    start_to: datetime | None,
+) -> dict[str, Any]:
+    """Compute the dashboard's overview aggregates.
+
+    Five queries, run **serially** on the shared CH client (see
+    list_traces' note for why concurrent queries are unsafe here):
+
+    1. Trace counts: total, rag, rag-with-citations.
+    2. Average retrieval latency.
+    3. Chunk-side aggregates: avg_top_similarity + chunks_never_cited_rate
+       in a single pass through retrieved_chunks.
+    4. Similarity-score histogram (GROUP BY bucket).
+    5. Traces over time (GROUP BY date).
+
+    Time-range scoping: each entity uses its own timestamp column
+    (traces.start_time, retrievals.timestamp, retrieved_chunks.timestamp,
+    citations.timestamp). The chunks_never_cited_rate counts citations
+    only within the same window - matches the rest of the
+    each-own-timestamp behaviour and keeps the headline number
+    independent of unbounded history.
+    """
+    pid = str(project_id)
+
+    trace_filter = _windowed_filter("start_time", start_from, start_to)
+    retr_filter = _windowed_filter("timestamp", start_from, start_to)
+    chunk_filter = _windowed_filter("timestamp", start_from, start_to)
+    cit_filter = _windowed_filter("timestamp", start_from, start_to)
+
+    params: dict[str, Any] = {"pid": pid}
+    if start_from is not None:
+        params["start_from"] = start_from
+    if start_to is not None:
+        params["start_to"] = start_to
+
+    counts = await asyncio.to_thread(
+        _query_trace_counts, ch, pid, trace_filter, retr_filter, cit_filter, params
+    )
+    avg_latency = await asyncio.to_thread(
+        _query_avg_retrieval_latency, ch, retr_filter, params
+    )
+    chunk_aggs = await asyncio.to_thread(
+        _query_chunk_aggregates, ch, chunk_filter, cit_filter, params
+    )
+    score_dist = await asyncio.to_thread(
+        _query_score_distribution, ch, chunk_filter, params
+    )
+    over_time = await asyncio.to_thread(
+        _query_traces_over_time, ch, trace_filter, params
+    )
+
+    total_traces = counts["total_traces"]
+    rag_traces = counts["rag_traces"]
+    rag_with_citations = counts["rag_with_citations"]
+    citation_coverage = rag_with_citations / rag_traces if rag_traces > 0 else 0.0
+
+    return {
+        "total_traces": total_traces,
+        "rag_traces": rag_traces,
+        "avg_retrieval_latency_ms": round(avg_latency),
+        "chunks_never_cited_rate": chunk_aggs["never_cited_rate"],
+        "avg_top_similarity": chunk_aggs["avg_top_similarity"],
+        "citation_coverage": citation_coverage,
+        "traces_over_time": over_time,
+        "score_distribution": score_dist,
+    }
+
+
+def _windowed_filter(
+    column: str, start_from: datetime | None, start_to: datetime | None
+) -> str:
+    """Return additional ``AND ...`` SQL for a windowed timestamp column.
+
+    Empty string when no time filter is set. Param names are fixed
+    (``start_from``, ``start_to``) and shared across all queries so the
+    caller can pass one params dict to all of them.
+    """
+    parts: list[str] = []
+    if start_from is not None:
+        parts.append(f"AND {column} >= %(start_from)s")
+    if start_to is not None:
+        parts.append(f"AND {column} <= %(start_to)s")
+    return " ".join(parts)
+
+
+def _query_trace_counts(
+    ch: Client,
+    pid: str,
+    trace_filter: str,
+    retr_filter: str,
+    cit_filter: str,
+    params: dict[str, Any],
+) -> dict[str, int]:
+    sql = f"""
+        WITH
+          rag_trace_ids AS (
+            SELECT DISTINCT trace_id FROM retrievals
+            WHERE project_id = %(pid)s {retr_filter}
+          ),
+          citation_trace_ids AS (
+            SELECT DISTINCT trace_id FROM citations
+            WHERE project_id = %(pid)s {cit_filter}
+          )
+        SELECT
+          count() AS total_traces,
+          countIf(trace_id IN (SELECT trace_id FROM rag_trace_ids)) AS rag_traces,
+          countIf(
+            trace_id IN (SELECT trace_id FROM rag_trace_ids)
+            AND trace_id IN (SELECT trace_id FROM citation_trace_ids)
+          ) AS rag_with_citations
+        FROM traces
+        WHERE project_id = %(pid)s {trace_filter}
+    """
+    rows = ch.query(sql, parameters=params).result_rows
+    if not rows:
+        return {"total_traces": 0, "rag_traces": 0, "rag_with_citations": 0}
+    r = rows[0]
+    return {
+        "total_traces": int(r[0]),
+        "rag_traces": int(r[1]),
+        "rag_with_citations": int(r[2]),
+    }
+
+
+def _query_avg_retrieval_latency(
+    ch: Client, retr_filter: str, params: dict[str, Any]
+) -> float:
+    sql = f"""
+        SELECT avg(latency_ms) FROM retrievals
+        WHERE project_id = %(pid)s {retr_filter}
+    """
+    rows = ch.query(sql, parameters=params).result_rows
+    if not rows:
+        return 0.0
+    value = rows[0][0]
+    # ClickHouse's avg() over an empty set returns Float64 NaN (not NULL),
+    # which round() can't convert to int. Treat NaN as "no data" -> 0.
+    if value is None or (isinstance(value, float) and math.isnan(value)):
+        return 0.0
+    return float(value)
+
+
+def _query_chunk_aggregates(
+    ch: Client,
+    chunk_filter: str,
+    cit_filter: str,
+    params: dict[str, Any],
+) -> dict[str, float]:
+    """One pass over retrieved_chunks yields both:
+    - avg_top_similarity (avg of rank=0 chunks)
+    - chunks_never_cited_rate (chunks not appearing in citations in window)
+    """
+    sql = f"""
+        WITH cited AS (
+          SELECT DISTINCT chunk_id FROM citations
+          WHERE project_id = %(pid)s {cit_filter}
+        )
+        SELECT
+          if(countIf(rank = 0) = 0, 0.0, avgIf(similarity_score, rank = 0)) AS avg_top_similarity,
+          if(count() = 0, 0.0,
+             countIf(chunk_id NOT IN (SELECT chunk_id FROM cited)) / count()) AS never_cited_rate
+        FROM retrieved_chunks
+        WHERE project_id = %(pid)s {chunk_filter}
+    """
+    rows = ch.query(sql, parameters=params).result_rows
+    if not rows:
+        return {"avg_top_similarity": 0.0, "never_cited_rate": 0.0}
+    r = rows[0]
+    return {
+        "avg_top_similarity": float(r[0] or 0.0),
+        "never_cited_rate": float(r[1] or 0.0),
+    }
+
+
+def _query_score_distribution(
+    ch: Client, chunk_filter: str, params: dict[str, Any]
+) -> list[dict[str, Any]]:
+    sql = f"""
+        SELECT
+          least(toUInt8(floor(similarity_score * 10)), 9) AS bucket_idx,
+          count() AS count
+        FROM retrieved_chunks
+        WHERE project_id = %(pid)s {chunk_filter}
+        GROUP BY bucket_idx
+        ORDER BY bucket_idx
+    """
+    rows = ch.query(sql, parameters=params).result_rows
+    return [
+        {
+            "bucket": f"{int(idx) / 10:.1f}-{(int(idx) + 1) / 10:.1f}",
+            "count": int(count),
+        }
+        for idx, count in rows
+    ]
+
+
+def _query_traces_over_time(
+    ch: Client, trace_filter: str, params: dict[str, Any]
+) -> list[dict[str, Any]]:
+    sql = f"""
+        SELECT toDate(start_time) AS d, count() AS c
+        FROM traces
+        WHERE project_id = %(pid)s {trace_filter}
+        GROUP BY d
+        ORDER BY d
+    """
+    rows = ch.query(sql, parameters=params).result_rows
+    return [{"date": d.isoformat(), "count": int(c)} for d, c in rows]
+
+
 __all__ = [
     "DEFAULT_LIST_LIMIT",
     "MAX_LIST_LIMIT",
     "get_trace_detail",
     "list_traces",
+    "metrics_overview",
 ]

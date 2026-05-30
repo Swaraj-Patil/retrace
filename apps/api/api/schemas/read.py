@@ -83,3 +83,29 @@ class TraceDetailResponse(_Strict):
     trace: TraceMeta
     retrievals: list[RetrievalDetail]
     citations: list[CitationDetail]
+
+
+class TracesOverTimePoint(_Strict):
+    date: str  # ISO YYYY-MM-DD
+    count: int = Field(ge=0)
+
+
+class ScoreBucket(_Strict):
+    # e.g. "0.8-0.9". Only non-empty buckets are returned; the
+    # dashboard fills in zeros for missing buckets if it wants a
+    # complete histogram.
+    bucket: str
+    count: int = Field(ge=0)
+
+
+class MetricsOverviewResponse(_Strict):
+    total_traces: int = Field(ge=0)
+    rag_traces: int = Field(ge=0)
+    avg_retrieval_latency_ms: int = Field(ge=0)
+    # The headline retrieval-waste signal: fraction of retrieved
+    # chunks (in window) that never appear in any citation (in window).
+    chunks_never_cited_rate: float = Field(ge=0.0, le=1.0)
+    avg_top_similarity: float = Field(ge=0.0, le=1.0)
+    citation_coverage: float = Field(ge=0.0, le=1.0)
+    traces_over_time: list[TracesOverTimePoint]
+    score_distribution: list[ScoreBucket]
