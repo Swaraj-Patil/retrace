@@ -39,6 +39,7 @@ from retrace._rag import (
     trace_retrieval,
 )
 from retrace._runtime import get_runtime
+from retrace.instrumentation import _anthropic as _anthropic_instr
 from retrace.instrumentation import _openai as _openai_instr
 
 __version__ = "0.0.1"
@@ -89,11 +90,15 @@ def init(
                 _log.warning("retrace: error starting batch sender", exc_info=True)
                 _sender = None
         if cfg.enabled:
-            # Idempotent; silent no-op if openai isn't installed.
+            # Idempotent; each is a silent no-op if its SDK isn't installed.
             try:
                 _openai_instr.install()
             except Exception:
                 _log.warning("retrace: openai instrumentation failed", exc_info=True)
+            try:
+                _anthropic_instr.install()
+            except Exception:
+                _log.warning("retrace: anthropic instrumentation failed", exc_info=True)
         if not _atexit_registered:
             atexit.register(_atexit_shutdown)
             _atexit_registered = True
@@ -166,6 +171,10 @@ def shutdown() -> None:
         _openai_instr.uninstall()
     except Exception:
         _log.warning("retrace: error uninstalling openai patch", exc_info=True)
+    try:
+        _anthropic_instr.uninstall()
+    except Exception:
+        _log.warning("retrace: error uninstalling anthropic patch", exc_info=True)
 
 
 def _atexit_shutdown() -> None:

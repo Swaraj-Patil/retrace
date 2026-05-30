@@ -115,9 +115,13 @@ def retrieval(
     logged inside via ``r.log_chunk`` / ``log_chunk`` are emitted
     immediately as ``ChunkEvent``s, not buffered until the scope ends.
 
-    If no outer ``trace()`` scope is active, a fresh trace_id is
-    generated and scoped to this retrieval's lifetime (consistent with
-    Day 4 instrumentation behavior).
+    Trace scoping: if no outer ``trace()`` is active, a fresh trace_id
+    is generated and scoped *only to this retrieval's lifetime*.
+    ``log_citation`` calls **inside** the scope see that trace_id;
+    calls **after** the scope exits do not. For multi-retrieval flows
+    or citations that need to reference chunks across retrievals, wrap
+    the whole flow in an explicit ``retrace.trace()`` block so every
+    operation shares one trace_id.
     """
     retrieval_id = uuid4()
     span_id = uuid4()
@@ -265,7 +269,13 @@ def log_citation(
 ) -> None:
     """Link a chunk to a span of the response, attached to the current trace.
 
-    Requires an active ``trace()`` (or retrieval, which auto-opens one).
+    Requires an active ``trace()`` (or an active ``retrieval()`` scope,
+    which auto-opens a trace for its own lifetime). To link citations
+    to chunks that came from a *different* retrieval scope, wrap the
+    whole flow in an explicit ``retrace.trace()`` so every operation
+    shares one trace_id; otherwise the retrieval's auto-generated
+    trace_id is gone once the scope exits and the citation is dropped.
+
     No-ops with a warning if no trace is active. The chunk_id is coerced
     via the same stable namespace as ``log_chunk``, so passing the same
     string id in both yields the same UUID.
