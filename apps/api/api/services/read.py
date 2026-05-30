@@ -429,6 +429,22 @@ def _query_trace_counts(
     }
 
 
+def _safe_avg(value: Any) -> float:
+    """Coerce a ClickHouse avg() cell to float, mapping NULL and NaN to 0.0.
+
+    ClickHouse's ``avg()`` over an empty set returns Float64 ``NaN``
+    (not NULL), which Python's ``round()`` cannot convert to int. The
+    rule for this module: every avg cell that crosses the SQL/Python
+    boundary goes through this helper, so the next aggregate someone
+    adds is automatically guarded.
+    """
+    if value is None:
+        return 0.0
+    if isinstance(value, float) and math.isnan(value):
+        return 0.0
+    return float(value)
+
+
 def _query_avg_retrieval_latency(
     ch: Client, retr_filter: str, params: dict[str, Any]
 ) -> float:
@@ -437,14 +453,7 @@ def _query_avg_retrieval_latency(
         WHERE project_id = %(pid)s {retr_filter}
     """
     rows = ch.query(sql, parameters=params).result_rows
-    if not rows:
-        return 0.0
-    value = rows[0][0]
-    # ClickHouse's avg() over an empty set returns Float64 NaN (not NULL),
-    # which round() can't convert to int. Treat NaN as "no data" -> 0.
-    if value is None or (isinstance(value, float) and math.isnan(value)):
-        return 0.0
-    return float(value)
+    return _safe_avg(rows[0][0]) if rows else 0.0
 
 
 def _query_chunk_aggregates(
@@ -457,13 +466,16 @@ def _query_chunk_aggregates(
     - avg_top_similarity (avg of rank=0 chunks)
     - chunks_never_cited_rate (chunks not appearing in citations in window)
     """
+    # avg_top_similarity: SQL returns NaN on empty set; _safe_avg guards.
+    # never_cited_rate: SQL guard against zero-denominator keeps the ratio
+    # a valid float in [0, 1] rather than NaN.
     sql = f"""
         WITH cited AS (
           SELECT DISTINCT chunk_id FROM citations
           WHERE project_id = %(pid)s {cit_filter}
         )
         SELECT
-          if(countIf(rank = 0) = 0, 0.0, avgIf(similarity_score, rank = 0)) AS avg_top_similarity,
+          avgIf(similarity_score, rank = 0) AS avg_top_similarity,
           if(count() = 0, 0.0,
              countIf(chunk_id NOT IN (SELECT chunk_id FROM cited)) / count()) AS never_cited_rate
         FROM retrieved_chunks
@@ -474,17 +486,23 @@ def _query_chunk_aggregates(
         return {"avg_top_similarity": 0.0, "never_cited_rate": 0.0}
     r = rows[0]
     return {
-        "avg_top_similarity": float(r[0] or 0.0),
-        "never_cited_rate": float(r[1] or 0.0),
+        "avg_top_similarity": _safe_avg(r[0]),
+        "never_cited_rate": _safe_avg(r[1]),
     }
 
 
 def _query_score_distribution(
     ch: Client, chunk_filter: str, params: dict[str, Any]
 ) -> list[dict[str, Any]]:
+    # ``similarity_score`` is Float32. A user-stored 0.9 round-trips as
+    # ~0.8999999762, and floor(0.8999999762 * 10) = 8 instead of 9 - so
+    # 0.9 would land in the "0.8-0.9" bucket. Add a tiny epsilon (1e-5,
+    # well below any realistic precision a user cares about) before the
+    # floor to absorb that error. The least(..., 9) still keeps 1.0 in
+    # the top bucket.
     sql = f"""
         SELECT
-          least(toUInt8(floor(similarity_score * 10)), 9) AS bucket_idx,
+          least(toUInt8(floor(similarity_score * 10 + 0.00001)), 9) AS bucket_idx,
           count() AS count
         FROM retrieved_chunks
         WHERE project_id = %(pid)s {chunk_filter}
