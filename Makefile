@@ -1,4 +1,4 @@
-.PHONY: help db-up db-down db-logs migrate-pg migrate-ch migrate seed verify reset api-dev
+.PHONY: help db-up db-down db-logs migrate-pg migrate-ch migrate seed verify reset api-dev web-dev dev
 
 help:
 	@echo "Targets:"
@@ -12,6 +12,8 @@ help:
 	@echo "  verify       Print row counts for all tables"
 	@echo "  reset        Drop volumes and start fresh (destructive)"
 	@echo "  api-dev      Run the API in reload mode on :8000"
+	@echo "  web-dev      Run the web app in dev mode on :3000"
+	@echo "  dev          Run api + web together via Turbo"
 
 db-up:
 	docker compose up -d postgres clickhouse
@@ -42,3 +44,9 @@ reset:
 
 api-dev:
 	cd apps/api && uv run uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+
+web-dev:
+	cd apps/web && pnpm dev
+
+dev:
+	pnpm run dev
