@@ -18,6 +18,7 @@ from api.routers import health as health_router
 from api.routers import ingest as ingest_router
 from api.routers import projects as projects_router
 from api.routers import traces as traces_router
+from api.routers.traces import TraceNotFound
 from api.services.ingest import (
     BatchTooLarge,
     PartialInsertFailure,
@@ -58,6 +59,10 @@ def create_app() -> FastAPI:
     @app.exception_handler(Unauthorized)
     async def _unauthorized_handler(_: Request, __: Unauthorized) -> JSONResponse:
         return JSONResponse(status_code=401, content={"error": "invalid_credentials"})
+
+    @app.exception_handler(TraceNotFound)
+    async def _trace_not_found_handler(_: Request, __: TraceNotFound) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"error": "trace_not_found"})
 
     @app.exception_handler(BatchTooLarge)
     async def _batch_too_large_handler(_: Request, __: BatchTooLarge) -> JSONResponse:
