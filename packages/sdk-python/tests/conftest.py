@@ -24,7 +24,7 @@ import pytest
 
 import retrace
 from retrace import _config, _runtime
-from retrace._context import current_trace_id
+from retrace._context import current_retrieval_id, current_trace_id
 
 
 @pytest.fixture(autouse=True)
@@ -32,14 +32,16 @@ def reset_sdk_state() -> Iterator[None]:
     retrace._reset_for_tests()
     _config.reset_for_tests()
     _runtime.reset_for_tests()
-    # Sync tests share the pytest thread's contextvars Context; clear the
-    # trace_id so each test starts with no current trace.
+    # Sync tests share the pytest thread's contextvars Context; clear so
+    # each test starts with no current trace/retrieval.
     current_trace_id.set(None)
+    current_retrieval_id.set(None)
     yield
     retrace._reset_for_tests()
     _config.reset_for_tests()
     _runtime.reset_for_tests()
     current_trace_id.set(None)
+    current_retrieval_id.set(None)
 
 
 # Deterministic UUIDs for the SDK integration-test fixture rows. The

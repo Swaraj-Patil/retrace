@@ -29,7 +29,15 @@ from retrace._config import (
     set_config,
 )
 from retrace._logging import get_logger
-from retrace._models import TraceEvent
+from retrace._models import AnyEvent
+from retrace._rag import (
+    log_chunk,
+    log_chunks,
+    log_citation,
+    retrieval,
+    trace,
+    trace_retrieval,
+)
 from retrace._runtime import get_runtime
 from retrace.instrumentation import _openai as _openai_instr
 
@@ -92,11 +100,12 @@ def init(
     return cfg
 
 
-def _enqueue_event(event: TraceEvent) -> None:
-    """Submit a trace event to the background sender. Non-blocking.
+def _enqueue_event(event: AnyEvent) -> None:
+    """Submit any event (trace/retrieval/chunk/citation) to the background sender.
 
-    Called from sync user-code paths (the OpenAI wrapper). Fails silently:
-    if the SDK isn't initialized or the runtime isn't up, drop the event.
+    Non-blocking. Called from sync user-code paths (auto-instrumentation
+    wrappers, manual RAG helpers). Fails silently: if the SDK isn't
+    initialized or the runtime isn't up, drop the event.
     """
     sender = _sender
     if sender is None:
@@ -189,4 +198,17 @@ def _reset_for_tests() -> None:
     _test_transport = None
 
 
-__all__ = ["SdkConfig", "__version__", "flush", "get_config", "init", "shutdown"]
+__all__ = [
+    "SdkConfig",
+    "__version__",
+    "flush",
+    "get_config",
+    "init",
+    "log_chunk",
+    "log_chunks",
+    "log_citation",
+    "retrieval",
+    "shutdown",
+    "trace",
+    "trace_retrieval",
+]

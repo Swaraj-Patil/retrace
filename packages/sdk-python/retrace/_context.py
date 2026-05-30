@@ -11,10 +11,17 @@ from contextvars import ContextVar
 from uuid import UUID, uuid4
 
 current_trace_id: ContextVar[UUID | None] = ContextVar("retrace_current_trace_id", default=None)
+current_retrieval_id: ContextVar[UUID | None] = ContextVar(
+    "retrace_current_retrieval_id", default=None
+)
 
 
 def get_current_trace_id() -> UUID | None:
     return current_trace_id.get()
+
+
+def get_current_retrieval_id() -> UUID | None:
+    return current_retrieval_id.get()
 
 
 def ensure_trace_id() -> UUID:
@@ -31,4 +38,10 @@ def ensure_trace_id() -> UUID:
     return new_id
 
 
-__all__ = ["current_trace_id", "ensure_trace_id", "get_current_trace_id"]
+__all__ = [
+    "current_retrieval_id",
+    "current_trace_id",
+    "ensure_trace_id",
+    "get_current_retrieval_id",
+    "get_current_trace_id",
+]

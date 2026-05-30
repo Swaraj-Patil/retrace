@@ -18,7 +18,7 @@ import asyncio
 
 from retrace._client import HttpClient
 from retrace._logging import get_logger
-from retrace._models import TraceEvent, serialize_payload
+from retrace._models import AnyEvent, serialize_payload
 
 _log = get_logger()
 
@@ -36,7 +36,7 @@ class AsyncBatchSender:
         self._client = client
         self._batch_size = batch_size
         self._flush_interval = flush_interval
-        self._buffer: list[TraceEvent] = []
+        self._buffer: list[AnyEvent] = []
         self._lock = asyncio.Lock()
         self._size_trigger = asyncio.Event()
         self._task: asyncio.Task[None] | None = None
@@ -49,7 +49,7 @@ class AsyncBatchSender:
         self._shutting_down = False
         self._task = asyncio.create_task(self._run(), name="retrace-flusher")
 
-    async def enqueue(self, event: TraceEvent) -> None:
+    async def enqueue(self, event: AnyEvent) -> None:
         signal = False
         async with self._lock:
             self._buffer.append(event)
