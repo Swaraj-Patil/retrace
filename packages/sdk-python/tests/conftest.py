@@ -11,13 +11,16 @@ from collections.abc import Iterator
 
 import pytest
 
+import retrace
 from retrace import _config, _runtime
 
 
 @pytest.fixture(autouse=True)
 def reset_sdk_state() -> Iterator[None]:
+    retrace._reset_for_tests()
     _config.reset_for_tests()
     _runtime.reset_for_tests()
     yield
+    retrace._reset_for_tests()
     _config.reset_for_tests()
     _runtime.reset_for_tests()
