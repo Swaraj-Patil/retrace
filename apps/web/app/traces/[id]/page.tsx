@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { ApiError, getTrace } from "@/lib/api";
 
+import { CitationsList } from "./_components/citations-list";
 import { RetrievalCard } from "./_components/retrieval-card";
 import { TraceHeader } from "./_components/trace-header";
 
@@ -40,7 +41,7 @@ export default async function TraceDetailPage({ params }: PageProps) {
         </div>
       )}
 
-      {/* Citations section lands in the next commit. */}
+      <CitationsList citations={detail.citations} retrievals={detail.retrievals} />
     </div>
   );
 }
