@@ -1,7 +1,10 @@
 import { ApiConfigError, getMetrics } from "@/lib/api";
 
+import { ChartCard } from "./_components/chart-card";
 import { HeroWasteCard } from "./_components/hero-waste-card";
 import { KpiCard } from "./_components/kpi-card";
+import { ScoreHistogram } from "./_components/score-histogram";
+import { TracesOverTimeChart } from "./_components/traces-over-time-chart";
 
 export default async function DashboardPage() {
   let metrics;
@@ -50,7 +53,20 @@ export default async function DashboardPage() {
         />
       </section>
 
-      {/* Charts row lands in the next commit. */}
+      <section
+        aria-label="Distributions"
+        className="mt-8 grid grid-cols-1 gap-3 lg:grid-cols-2"
+      >
+        <ChartCard
+          label="Similarity score distribution"
+          hint="Across all retrieved chunks"
+        >
+          <ScoreHistogram data={metrics.score_distribution} />
+        </ChartCard>
+        <ChartCard label="Traces over time" hint="Daily counts">
+          <TracesOverTimeChart data={metrics.traces_over_time} />
+        </ChartCard>
+      </section>
 
       {/* Generic supporting metrics - muted variant so they recede. */}
       <section
