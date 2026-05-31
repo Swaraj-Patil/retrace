@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { ApiError, getTrace } from "@/lib/api";
 
+import { RetrievalCard } from "./_components/retrieval-card";
 import { TraceHeader } from "./_components/trace-header";
 
 interface PageProps {
@@ -25,7 +26,21 @@ export default async function TraceDetailPage({ params }: PageProps) {
   return (
     <div className="mx-auto max-w-5xl px-6 py-8">
       <TraceHeader detail={detail} />
-      {/* Retrieval cards land in the next commit. */}
+
+      {detail.retrievals.length > 0 && (
+        <div className="mt-10 space-y-6">
+          {detail.retrievals.map((r, i) => (
+            <RetrievalCard
+              key={r.retrieval_id}
+              retrieval={r}
+              index={i}
+              total={detail.retrievals.length}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Citations section lands in the next commit. */}
     </div>
   );
 }
