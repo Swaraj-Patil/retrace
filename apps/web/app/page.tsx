@@ -1,26 +1,38 @@
 import { ApiConfigError, getMetrics } from "@/lib/api";
+import { parseTimeRange, timeRangeToFromTo } from "@/lib/time-range";
 
 import { ChartCard } from "./_components/chart-card";
 import { HeroWasteCard } from "./_components/hero-waste-card";
 import { KpiCard } from "./_components/kpi-card";
 import { ScoreHistogram } from "./_components/score-histogram";
+import { TimeRangeSelect } from "./_components/time-range-select";
 import { TracesOverTimeChart } from "./_components/traces-over-time-chart";
 
-export default async function DashboardPage() {
+interface PageProps {
+  searchParams: { range?: string };
+}
+
+export default async function DashboardPage({ searchParams }: PageProps) {
+  const range = parseTimeRange(searchParams.range);
+  const { from, to } = timeRangeToFromTo(range);
+
   let metrics;
   try {
-    metrics = await getMetrics();
+    metrics = await getMetrics({ from, to });
   } catch (err) {
     return <ErrorView error={err} />;
   }
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
-      <header className="mb-6">
-        <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Retrieval quality across all traces.
-        </p>
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Retrieval quality across all traces.
+          </p>
+        </div>
+        <TimeRangeSelect active={range} />
       </header>
 
       <HeroWasteCard metrics={metrics} />
@@ -78,11 +90,7 @@ export default async function DashboardPage() {
           label="Avg retrieval latency"
           value={`${metrics.avg_retrieval_latency_ms} ms`}
         />
-        <KpiCard
-          variant="muted"
-          label="Total traces"
-          value={metrics.total_traces}
-        />
+        <KpiCard variant="muted" label="Total traces" value={metrics.total_traces} />
       </section>
     </div>
   );

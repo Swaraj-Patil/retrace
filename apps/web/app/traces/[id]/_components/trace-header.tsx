@@ -67,7 +67,7 @@ export function TraceHeader({ detail }: Props) {
         </Row>
       </dl>
 
-      {retrievals.length > 0 && (
+      {retrievals.length > 0 ? (
         <p className="mt-6 font-mono text-sm tabular-nums">
           <span className="text-muted-foreground">
             {summary.totalChunks} {summary.totalChunks === 1 ? "chunk" : "chunks"} retrieved
@@ -88,6 +88,10 @@ export function TraceHeader({ detail }: Props) {
               </span>
             </>
           )}
+        </p>
+      ) : (
+        <p className="mt-6 font-mono text-sm text-muted-foreground">
+          No retrievals captured for this trace.
         </p>
       )}
     </header>
