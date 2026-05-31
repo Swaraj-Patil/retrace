@@ -10,12 +10,13 @@ interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
-  disabled?: boolean;
+  /** When true, only an exact pathname match counts as active (used for "/"). */
+  exact?: boolean;
 }
 
 const NAV: NavItem[] = [
+  { href: "/", label: "Dashboard", icon: BarChart3, exact: true },
   { href: "/traces", label: "Traces", icon: ListTree },
-  { href: "/metrics", label: "Metrics", icon: BarChart3, disabled: true },
 ];
 
 export function SidebarNav() {
@@ -23,43 +24,21 @@ export function SidebarNav() {
   return (
     <nav className="flex flex-col gap-0.5 px-2">
       {NAV.map((item) => {
-        const active = pathname.startsWith(item.href);
+        const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
         const Icon = item.icon;
-        const content = (
-          <>
-            <Icon className="h-4 w-4" />
-            <span>{item.label}</span>
-            {item.disabled && (
-              <span className="ml-auto text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                Soon
-              </span>
-            )}
-          </>
-        );
-        const baseClass =
-          "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors";
-        if (item.disabled) {
-          return (
-            <span
-              key={item.href}
-              className={cn(baseClass, "cursor-not-allowed text-muted-foreground/70")}
-            >
-              {content}
-            </span>
-          );
-        }
         return (
           <Link
             key={item.href}
             href={item.href}
             className={cn(
-              baseClass,
+              "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors",
               active
                 ? "bg-secondary text-foreground"
                 : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
             )}
           >
-            {content}
+            <Icon className="h-4 w-4" />
+            <span>{item.label}</span>
           </Link>
         );
       })}
