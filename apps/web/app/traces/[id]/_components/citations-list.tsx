@@ -1,7 +1,6 @@
 import { ArrowRight, Quote } from "lucide-react";
 
 import { shortId } from "@/lib/format";
-import { cn } from "@/lib/utils";
 import type { CitationDetail, RetrievalDetail } from "@/lib/types";
 
 interface Props {
@@ -45,26 +44,29 @@ export function CitationsList({ citations, retrievals }: Props) {
             >
               <Quote className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
 
-              <a
-                href={`#chunk-${cit.chunk_id}`}
-                className={cn(
-                  "inline-flex items-center gap-2 transition-colors",
-                  isOrphan
-                    ? "cursor-default text-muted-foreground"
-                    : "text-foreground hover:text-accent",
-                )}
-                aria-disabled={isOrphan}
-                onClick={(e) => {
-                  if (isOrphan) e.preventDefault();
-                }}
-              >
-                <span className="font-mono text-xs">chunk {shortId(cit.chunk_id)}</span>
-                {rank !== undefined && (
-                  <span className="font-mono text-[11px] text-muted-foreground">
-                    (rank {rank})
-                  </span>
-                )}
-              </a>
+              {/* Orphans render as a plain <span> (no <a>, no handler).
+               * aria-disabled on an anchor is informational only - it doesn't
+               * prevent navigation - which is why a previous draft reached for
+               * onClick + preventDefault. Switching to <span> for the orphan
+               * branch drops the JS entirely and keeps the file a clean
+               * Server Component (no "use client" needed). */}
+              {isOrphan ? (
+                <span className="inline-flex items-center gap-2 text-muted-foreground">
+                  <span className="font-mono text-xs">chunk {shortId(cit.chunk_id)}</span>
+                </span>
+              ) : (
+                <a
+                  href={`#chunk-${cit.chunk_id}`}
+                  className="inline-flex items-center gap-2 text-foreground transition-colors hover:text-accent"
+                >
+                  <span className="font-mono text-xs">chunk {shortId(cit.chunk_id)}</span>
+                  {rank !== undefined && (
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      (rank {rank})
+                    </span>
+                  )}
+                </a>
+              )}
 
               <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground/60" />
 
