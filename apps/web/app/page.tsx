@@ -27,13 +27,27 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     <div className="mx-auto max-w-6xl px-6 py-8">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/80">
+            Demo · sample data
+          </p>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight">Dashboard</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Retrieval quality across all traces.
+            Retrieval quality across all traces. Click any trace to inspect its retrieval chain.
           </p>
         </div>
         <TimeRangeSelect active={range} />
       </header>
+
+      {/* Cold-visitor framing. Static text; not amber - the wedge is the
+       * hero card below, not this prose. Bold first sentence acts as a
+       * soft label for what Retrace is. */}
+      <section aria-label="About Retrace" className="mb-6 max-w-3xl">
+        <p className="text-sm leading-relaxed text-foreground/85">
+          <span className="font-medium">RAG-native observability for LLM applications.</span>{" "}
+          The headline below is the share of retrieved chunks the model didn&rsquo;t cite &mdash;
+          retrieval waste, made visible.
+        </p>
+      </section>
 
       <HeroWasteCard metrics={metrics} />
 
