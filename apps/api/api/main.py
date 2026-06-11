@@ -19,6 +19,7 @@ from api.dependencies.auth import (
 from api.logging import configure_logging
 from api.middleware import RequestIdMiddleware
 from api.routers import auth as auth_router
+from api.routers import console as console_router
 from api.routers import health as health_router
 from api.routers import ingest as ingest_router
 from api.routers import metrics as metrics_router
@@ -27,6 +28,11 @@ from api.routers import traces as traces_router
 from api.routers.traces import TraceNotFound
 from api.services.auth import EmailAlreadyRegistered, OrgSlugCollision
 from api.services.auth_rate_limit import RateLimited
+from api.services.console import (
+    ApiKeyNotFound,
+    CannotDetermineOrg,
+    ProjectSlugTaken,
+)
 from api.services.ingest import (
     BatchTooLarge,
     PartialInsertFailure,
@@ -61,6 +67,7 @@ def create_app() -> FastAPI:
     app.add_middleware(RequestIdMiddleware)
     app.include_router(health_router.router)
     app.include_router(auth_router.router)
+    app.include_router(console_router.router)
     app.include_router(ingest_router.router)
     app.include_router(projects_router.router)
     app.include_router(traces_router.router)
@@ -109,6 +116,22 @@ def create_app() -> FastAPI:
             content={"error": "rate_limited"},
             headers={"Retry-After": "60"},
         )
+
+    @app.exception_handler(ProjectSlugTaken)
+    async def _slug_taken_handler(_: Request, __: ProjectSlugTaken) -> JSONResponse:
+        return JSONResponse(status_code=409, content={"error": "project_slug_taken"})
+
+    @app.exception_handler(CannotDetermineOrg)
+    async def _cannot_determine_org_handler(
+        _: Request, __: CannotDetermineOrg
+    ) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"error": "cannot_determine_org"})
+
+    @app.exception_handler(ApiKeyNotFound)
+    async def _api_key_not_found_handler(
+        _: Request, __: ApiKeyNotFound
+    ) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"error": "api_key_not_found"})
 
     @app.exception_handler(TraceNotFound)
     async def _trace_not_found_handler(_: Request, __: TraceNotFound) -> JSONResponse:

@@ -38,7 +38,7 @@ from typing import Annotated
 from uuid import UUID
 
 import structlog
-from fastapi import Depends, Query, Request
+from fastapi import Depends, Path, Query, Request
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -239,6 +239,22 @@ async def get_current_user(
     if not raw_token.startswith(SESSION_TOKEN_NAMESPACE):
         raise Unauthorized
     return await _resolve_session(raw_token, db)
+
+
+async def get_user_authorized_project_context(
+    project_id: Annotated[UUID, Path()],
+    actor: Annotated[UserActor, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ProjectContext:
+    """Resolve ``{project_id}`` from the URL via the caller's memberships.
+
+    Used by console endpoints that scope to a specific project (the
+    key-management routes). Raises :class:`ProjectNotFound` (404) on
+    miss or cross-org, with no way for the caller to distinguish the
+    two. API keys never reach here because the wrapped
+    ``get_current_user`` rejects them at the bearer layer.
+    """
+    return await _project_context_for_user(actor.user_id, project_id, db)
 
 
 async def _update_last_used(api_key_id: UUID) -> None:
