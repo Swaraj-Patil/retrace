@@ -9,7 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 
 from api.clickhouse.client import get_client
-from api.dependencies.auth import ProjectContext, get_current_project
+from api.dependencies.auth import ProjectContext, get_current_project_any_auth
 from api.schemas.read import TraceDetailResponse, TraceListResponse
 from api.services.read import (
     DEFAULT_LIST_LIMIT,
@@ -33,7 +33,7 @@ router = APIRouter(prefix="/v1", tags=["traces"])
 
 @router.get("/traces", response_model=TraceListResponse)
 async def list_traces_endpoint(
-    ctx: Annotated[ProjectContext, Depends(get_current_project)],
+    ctx: Annotated[ProjectContext, Depends(get_current_project_any_auth)],
     limit: Annotated[int, Query(ge=1, le=MAX_LIST_LIMIT)] = DEFAULT_LIST_LIMIT,
     offset: Annotated[int, Query(ge=0)] = 0,
     rag_only: Annotated[bool, Query()] = False,
@@ -63,7 +63,7 @@ async def list_traces_endpoint(
 @router.get("/traces/{trace_id}", response_model=TraceDetailResponse)
 async def get_trace_endpoint(
     trace_id: UUID,
-    ctx: Annotated[ProjectContext, Depends(get_current_project)],
+    ctx: Annotated[ProjectContext, Depends(get_current_project_any_auth)],
 ) -> TraceDetailResponse:
     ch = get_client()
     detail = await get_trace_detail(ch, project_id=ctx.project_id, trace_id=trace_id)
