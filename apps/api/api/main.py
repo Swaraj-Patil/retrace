@@ -11,15 +11,22 @@ from fastapi.responses import JSONResponse
 
 from api.config import get_settings
 from api.db.session import engine
-from api.dependencies.auth import Unauthorized
+from api.dependencies.auth import (
+    ProjectIdRequired,
+    ProjectNotFound,
+    Unauthorized,
+)
 from api.logging import configure_logging
 from api.middleware import RequestIdMiddleware
+from api.routers import auth as auth_router
 from api.routers import health as health_router
 from api.routers import ingest as ingest_router
 from api.routers import metrics as metrics_router
 from api.routers import projects as projects_router
 from api.routers import traces as traces_router
 from api.routers.traces import TraceNotFound
+from api.services.auth import EmailAlreadyRegistered, OrgSlugCollision
+from api.services.auth_rate_limit import RateLimited
 from api.services.ingest import (
     BatchTooLarge,
     PartialInsertFailure,
@@ -53,6 +60,7 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(RequestIdMiddleware)
     app.include_router(health_router.router)
+    app.include_router(auth_router.router)
     app.include_router(ingest_router.router)
     app.include_router(projects_router.router)
     app.include_router(traces_router.router)
@@ -61,6 +69,46 @@ def create_app() -> FastAPI:
     @app.exception_handler(Unauthorized)
     async def _unauthorized_handler(_: Request, __: Unauthorized) -> JSONResponse:
         return JSONResponse(status_code=401, content={"error": "invalid_credentials"})
+
+    @app.exception_handler(ProjectIdRequired)
+    async def _project_id_required_handler(
+        _: Request, __: ProjectIdRequired
+    ) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"error": "project_id_required"})
+
+    @app.exception_handler(ProjectNotFound)
+    async def _project_not_found_handler(
+        _: Request, __: ProjectNotFound
+    ) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"error": "project_not_found"})
+
+    @app.exception_handler(EmailAlreadyRegistered)
+    async def _email_taken_handler(
+        _: Request, __: EmailAlreadyRegistered
+    ) -> JSONResponse:
+        return JSONResponse(status_code=409, content={"error": "email_already_registered"})
+
+    @app.exception_handler(OrgSlugCollision)
+    async def _slug_collision_handler(
+        request: Request, _: OrgSlugCollision
+    ) -> JSONResponse:
+        # Five retries with fresh random suffixes should never exhaust;
+        # if they do something is very wrong (e.g., the DB rejecting
+        # every insert for an unrelated reason). Log + 500.
+        request_id = getattr(request.state, "request_id", "unknown")
+        _logger.error("auth.org_slug_collision_exhausted")
+        return JSONResponse(
+            status_code=500,
+            content={"error": "internal_error", "request_id": request_id},
+        )
+
+    @app.exception_handler(RateLimited)
+    async def _rate_limited_handler(_: Request, __: RateLimited) -> JSONResponse:
+        return JSONResponse(
+            status_code=429,
+            content={"error": "rate_limited"},
+            headers={"Retry-After": "60"},
+        )
 
     @app.exception_handler(TraceNotFound)
     async def _trace_not_found_handler(_: Request, __: TraceNotFound) -> JSONResponse:

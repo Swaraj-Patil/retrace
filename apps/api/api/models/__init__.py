@@ -5,6 +5,7 @@ from api.models.membership import Membership, MembershipRole
 from api.models.org import Org
 from api.models.project import Project
 from api.models.user import User
+from api.models.user_session import UserSession
 
 __all__ = [
     "ApiKey",
@@ -13,4 +14,5 @@ __all__ = [
     "Org",
     "Project",
     "User",
+    "UserSession",
 ]
