@@ -107,3 +107,28 @@ export interface MetricsParams {
   from?: string;
   to?: string;
 }
+
+// Auth + console shapes. Mirrors apps/api/api/schemas/auth.py and
+// apps/api/api/schemas/console.py field-for-field.
+
+export interface SessionTokenResponse {
+  token: string;
+  /** ISO 8601 timestamp; ``new Date(expires_at)`` is safe for the
+   *  cookie ``expires`` option. */
+  expires_at: string;
+}
+
+export interface OrgRef {
+  id: string;
+  name: string;
+  slug: string;
+  /** ``owner`` | ``admin`` | ``member`` from the membership table. */
+  role: string;
+}
+
+export interface MeResponse {
+  user_id: string;
+  email: string;
+  name: string | null;
+  orgs: OrgRef[];
+}

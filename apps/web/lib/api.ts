@@ -23,8 +23,10 @@ import "server-only";
 
 import type {
   ListTracesParams,
+  MeResponse,
   MetricsOverviewResponse,
   MetricsParams,
+  SessionTokenResponse,
   TraceDetailResponse,
   TraceListResponse,
 } from "@/lib/types";
@@ -150,4 +152,86 @@ export async function getMetrics(
     from: params.from,
     to: params.to,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Backend auth helpers
+//
+// These talk to /v1/auth/{login,register,logout,me} without an
+// ``ApiContext`` because they're the ones that *produce* the credential
+// (login, register) or operate on it directly (logout, me). They're
+// called only from server actions; the response token never crosses
+// the server/client boundary except as a ``Set-Cookie`` header.
+// ---------------------------------------------------------------------------
+
+async function unauthenticatedPost<T>(path: string, body: object): Promise<T> {
+  const res = await fetch(`${apiBaseUrl()}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    let errorBody: unknown = null;
+    try {
+      errorBody = await res.json();
+    } catch {
+      // Non-JSON error body; leave null.
+    }
+    throw new ApiError(res.status, errorBody);
+  }
+  return (await res.json()) as T;
+}
+
+export async function backendLogin(
+  email: string,
+  password: string,
+): Promise<SessionTokenResponse> {
+  return unauthenticatedPost<SessionTokenResponse>("/v1/auth/login", {
+    email,
+    password,
+  });
+}
+
+export async function backendRegister(
+  email: string,
+  password: string,
+  name?: string,
+): Promise<SessionTokenResponse> {
+  return unauthenticatedPost<SessionTokenResponse>("/v1/auth/register", {
+    email,
+    password,
+    ...(name ? { name } : {}),
+  });
+}
+
+export async function backendLogout(token: string): Promise<void> {
+  const res = await fetch(`${apiBaseUrl()}/v1/auth/logout`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  // 204 expected. 401 means the token is already stale (expired/
+  // revoked) - the caller is logging out anyway, so swallow it.
+  // Anything else is unexpected; surface it.
+  if (!res.ok && res.status !== 401) {
+    throw new ApiError(res.status, null);
+  }
+}
+
+export async function backendMe(token: string): Promise<MeResponse> {
+  const res = await fetch(`${apiBaseUrl()}/v1/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    let errorBody: unknown = null;
+    try {
+      errorBody = await res.json();
+    } catch {
+      // Non-JSON error body; leave null.
+    }
+    throw new ApiError(res.status, errorBody);
+  }
+  return (await res.json()) as MeResponse;
 }

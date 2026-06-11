@@ -2,11 +2,12 @@ import Link from "next/link";
 
 import { Brand } from "@/components/shell/brand";
 
-/**
- * Stub login page. Real form arrives in Commit 2 (session plumbing).
- * Kept as a routable placeholder so the landing-page CTA resolves to a
- * real page during the Commit 1 smoke pass.
- */
+import { LoginForm } from "./_components/login-form";
+
+export const metadata = {
+  title: "Log in · Retrace",
+};
+
 export default function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col">
@@ -16,11 +17,16 @@ export default function LoginPage() {
         </Link>
       </header>
       <main className="flex flex-1 items-center justify-center px-6">
-        <div className="w-full max-w-sm py-16">
+        <div className="w-full max-w-sm py-12">
           <h1 className="text-2xl font-semibold tracking-tight">Log in</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Sign-in form lands in the next commit.
+          <p className="mt-1 text-sm text-muted-foreground">
+            Welcome back.
           </p>
+
+          <div className="mt-8">
+            <LoginForm />
+          </div>
+
           <p className="mt-6 text-sm text-muted-foreground">
             Need an account?{" "}
             <Link href="/register" className="text-foreground hover:underline">
