@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import Field, StringConstraints, field_validator
+from pydantic import Field, StringConstraints, field_validator, model_validator
 
 from api.schemas._base import _Strict
 
@@ -20,6 +20,19 @@ _SlugField = Annotated[
     str,
     StringConstraints(pattern=_SLUG_PATTERN, min_length=1, max_length=63),
 ]
+
+
+def _slugify(s: str) -> str:
+    """Lowercase + ASCII-alnum + single dashes. Returns ``""`` when no
+    ASCII alphanumerics survive (e.g., a punctuation- or emoji-only
+    input)."""
+    out: list[str] = []
+    for ch in s.lower():
+        if ch.isalnum() and ch.isascii():
+            out.append(ch)
+        elif out and out[-1] != "-":
+            out.append("-")
+    return "".join(out).strip("-")[:63]
 
 
 class ProjectListItem(_Strict):
@@ -46,6 +59,25 @@ class CreateProjectRequest(_Strict):
         if isinstance(v, str):
             return v.strip()
         return v
+
+    @model_validator(mode="after")
+    def _derive_slug_or_reject(self) -> CreateProjectRequest:
+        # When no explicit slug is given, derive one from the name. If
+        # the name has no ASCII alphanumerics (e.g., "!!!" or an emoji-
+        # only string) the derivation is empty - reject with a clean
+        # 422 instead of silently falling back to a generic slug, which
+        # would either misrepresent the user's input or collide with
+        # another such project. The router and service can then assume
+        # ``self.slug`` is always a non-empty, pattern-valid slug.
+        if self.slug is None:
+            derived = _slugify(self.name)
+            if not derived:
+                raise ValueError(
+                    "name does not contain ASCII alphanumerics; "
+                    "provide an explicit slug"
+                )
+            self.slug = derived
+        return self
 
 
 class CreateProjectResponse(_Strict):

@@ -64,11 +64,13 @@ async def list_projects_for_user(
 
 
 async def create_project_for_user(
-    db: AsyncSession, *, user_id: UUID, name: str, slug: str | None
+    db: AsyncSession, *, user_id: UUID, name: str, slug: str
 ) -> Project:
+    # Schema is responsible for deriving and validating ``slug`` before
+    # it reaches here; this layer can assume a non-empty, pattern-valid
+    # value.
     org_id = await _single_org_for_user(db, user_id)
-    final_slug = slug or _slugify(name) or "project"
-    project = Project(org_id=org_id, name=name, slug=final_slug)
+    project = Project(org_id=org_id, name=name, slug=slug)
     db.add(project)
     try:
         await db.commit()
@@ -141,14 +143,3 @@ async def _single_org_for_user(db: AsyncSession, user_id: UUID) -> UUID:
     if len(org_ids) != 1:
         raise CannotDetermineOrg
     return org_ids[0]
-
-
-def _slugify(s: str) -> str:
-    """Lowercase + ASCII-alnum + single dashes. Returns ``""`` if no chars survive."""
-    out: list[str] = []
-    for ch in s.lower():
-        if ch.isalnum():
-            out.append(ch)
-        elif out and out[-1] != "-":
-            out.append("-")
-    return "".join(out).strip("-")[:63]
