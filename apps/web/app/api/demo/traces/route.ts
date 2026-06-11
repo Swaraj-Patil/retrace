@@ -9,7 +9,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 
-import { ApiError, listTraces } from "@/lib/api";
+import { ApiError, demoContext, listTraces } from "@/lib/api";
 
 export const runtime = "nodejs";
 
@@ -22,7 +22,7 @@ function parseIntParam(value: string | null, fallback: number): number {
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   try {
-    const data = await listTraces({
+    const data = await listTraces(demoContext(), {
       limit: parseIntParam(sp.get("limit"), 50),
       offset: parseIntParam(sp.get("offset"), 0),
       rag_only: sp.get("rag_only") === "true",

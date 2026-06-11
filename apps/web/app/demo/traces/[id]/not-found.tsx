@@ -15,7 +15,7 @@ export default function TraceNotFound() {
         </p>
       </div>
       <Link
-        href="/traces"
+        href="/demo/traces"
         className="inline-flex items-center gap-1.5 text-sm text-accent hover:underline"
       >
         <ArrowLeft className="h-3.5 w-3.5" />

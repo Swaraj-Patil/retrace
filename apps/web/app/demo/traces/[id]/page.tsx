@@ -1,10 +1,10 @@
 import { notFound } from "next/navigation";
 
-import { ApiError, getTrace } from "@/lib/api";
+import { ApiError, demoContext, getTrace } from "@/lib/api";
 
-import { CitationsList } from "./_components/citations-list";
-import { RetrievalCard } from "./_components/retrieval-card";
-import { TraceHeader } from "./_components/trace-header";
+import { CitationsList } from "@/components/trace-detail/citations-list";
+import { RetrievalCard } from "@/components/trace-detail/retrieval-card";
+import { TraceHeader } from "@/components/trace-detail/trace-header";
 
 interface PageProps {
   params: { id: string };
@@ -13,7 +13,7 @@ interface PageProps {
 export default async function TraceDetailPage({ params }: PageProps) {
   let detail;
   try {
-    detail = await getTrace(params.id);
+    detail = await getTrace(demoContext(), params.id);
   } catch (err) {
     // Both unknown-trace and cross-project access surface as 404 from the
     // API. notFound() renders the segment's not-found.tsx; anything else
@@ -26,7 +26,7 @@ export default async function TraceDetailPage({ params }: PageProps) {
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-8">
-      <TraceHeader detail={detail} />
+      <TraceHeader detail={detail} backHref="/demo/traces" />
 
       {detail.retrievals.length > 0 && (
         <div className="mt-10 space-y-6">

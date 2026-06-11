@@ -15,8 +15,8 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { href: "/", label: "Dashboard", icon: BarChart3, exact: true },
-  { href: "/traces", label: "Traces", icon: ListTree },
+  { href: "/demo", label: "Dashboard", icon: BarChart3, exact: true },
+  { href: "/demo/traces", label: "Traces", icon: ListTree },
 ];
 
 export function SidebarNav() {

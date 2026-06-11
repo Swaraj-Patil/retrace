@@ -9,7 +9,7 @@ export function Sidebar() {
   return (
     <aside className="sticky top-0 hidden h-screen w-[220px] shrink-0 flex-col border-r border-border bg-card/50 md:flex">
       <div className="flex h-14 items-center px-4">
-        <Link href="/traces" aria-label="Retrace home">
+        <Link href="/" aria-label="Retrace home">
           <Brand />
         </Link>
       </div>

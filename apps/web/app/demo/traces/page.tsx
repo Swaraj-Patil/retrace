@@ -1,7 +1,7 @@
-import { ApiConfigError, listTraces } from "@/lib/api";
+import { ApiConfigError, demoContext, listTraces } from "@/lib/api";
 
-import { RagFilter } from "./_components/rag-filter";
-import { TraceTable } from "./_components/trace-table";
+import { RagFilter } from "@/components/traces/rag-filter";
+import { TraceTable } from "@/components/traces/trace-table";
 
 const PAGE_SIZE = 50;
 
@@ -14,7 +14,11 @@ export default async function TracesPage({ searchParams }: PageProps) {
 
   let initial;
   try {
-    initial = await listTraces({ limit: PAGE_SIZE, offset: 0, rag_only: ragOnly });
+    initial = await listTraces(demoContext(), {
+      limit: PAGE_SIZE,
+      offset: 0,
+      rag_only: ragOnly,
+    });
   } catch (err) {
     return <ErrorView error={err} />;
   }
@@ -31,7 +35,12 @@ export default async function TracesPage({ searchParams }: PageProps) {
         <RagFilter value={ragOnly} />
       </header>
 
-      <TraceTable initial={initial} ragOnly={ragOnly} />
+      <TraceTable
+        initial={initial}
+        ragOnly={ragOnly}
+        apiPath="/api/demo/traces"
+        basePath="/demo/traces"
+      />
     </div>
   );
 }

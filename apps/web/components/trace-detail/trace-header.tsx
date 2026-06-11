@@ -15,9 +15,12 @@ import { CopyIdButton } from "./copy-id-button";
 
 interface Props {
   detail: TraceDetailResponse;
+  /** Where the "Traces" back-link returns to. Demo passes
+   *  ``/demo/traces``; the per-user app passes ``/app/traces``. */
+  backHref: string;
 }
 
-export function TraceHeader({ detail }: Props) {
+export function TraceHeader({ detail, backHref }: Props) {
   const { trace, retrievals, citations } = detail;
   const summary = computeRetrievalSummary(detail);
   const isError = trace.status.toLowerCase() === "error";
@@ -25,7 +28,7 @@ export function TraceHeader({ detail }: Props) {
   return (
     <header>
       <Link
-        href="/traces"
+        href={backHref}
         className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft className="h-3.5 w-3.5" />

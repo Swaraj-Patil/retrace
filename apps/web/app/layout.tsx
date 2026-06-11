@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { GeistMono } from "geist/font/mono";
 
-import { Sidebar } from "@/components/shell/sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +14,12 @@ export const metadata: Metadata = {
   description: "RAG-native observability for LLM applications.",
 };
 
+/**
+ * Root layout. Renders the html/body shell and the theme provider only;
+ * the in-app chrome (sidebar, nav, demo banner, etc.) lives in route-group
+ * layouts under app/demo and app/app. That keeps /, /login, and /register
+ * sidebar-free without conditional rendering at the root.
+ */
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
@@ -26,10 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         )}
       >
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-          <div className="flex min-h-screen">
-            <Sidebar />
-            <main className="flex-1 overflow-hidden">{children}</main>
-          </div>
+          {children}
         </ThemeProvider>
       </body>
     </html>

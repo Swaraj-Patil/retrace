@@ -47,7 +47,7 @@ export default function TraceDetailError({
           Try again
         </Button>
         <Link
-          href="/traces"
+          href="/demo/traces"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-3.5 w-3.5" />

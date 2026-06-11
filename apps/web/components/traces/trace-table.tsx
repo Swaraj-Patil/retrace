@@ -29,9 +29,22 @@ const PAGE_SIZE = 50;
 interface Props {
   initial: TraceListResponse;
   ragOnly: boolean;
+  /**
+   * Server-side route handler used by Load-More. Demo passes
+   * ``/api/demo/traces``; the per-user app (Commit 3) passes
+   * ``/api/app/traces``. Both handlers funnel through ``lib/api.ts``
+   * with the right credential, so the bearer token never reaches
+   * this client component.
+   */
+  apiPath: string;
+  /**
+   * Parent traces route - each row links to ``${basePath}/<trace_id>``.
+   * Demo passes ``/demo/traces``; the per-user app passes ``/app/traces``.
+   */
+  basePath: string;
 }
 
-export function TraceTable({ initial, ragOnly }: Props) {
+export function TraceTable({ initial, ragOnly, apiPath, basePath }: Props) {
   const [items, setItems] = React.useState<TraceListItem[]>(initial.traces);
   const [offset, setOffset] = React.useState<number>(initial.traces.length);
   const total = initial.total;
@@ -54,7 +67,7 @@ export function TraceTable({ initial, ragOnly }: Props) {
         offset: String(offset),
         ...(ragOnly ? { rag_only: "true" } : {}),
       });
-      const res = await fetch(`/api/traces?${qs.toString()}`, { cache: "no-store" });
+      const res = await fetch(`${apiPath}?${qs.toString()}`, { cache: "no-store" });
       if (!res.ok) {
         throw new Error(`Server returned ${res.status}`);
       }
@@ -93,7 +106,7 @@ export function TraceTable({ initial, ragOnly }: Props) {
           </TableHeader>
           <TableBody>
             {items.map((t) => (
-              <TraceRow key={t.trace_id} trace={t} />
+              <TraceRow key={t.trace_id} trace={t} basePath={basePath} />
             ))}
           </TableBody>
         </Table>
@@ -133,13 +146,13 @@ export function TraceTable({ initial, ragOnly }: Props) {
   );
 }
 
-function TraceRow({ trace }: { trace: TraceListItem }) {
+function TraceRow({ trace, basePath }: { trace: TraceListItem; basePath: string }) {
   const isError = trace.status.toLowerCase() === "error";
   return (
     <TableRow>
       <TableCell className="font-mono text-xs">
         <Link
-          href={`/traces/${trace.trace_id}`}
+          href={`${basePath}/${trace.trace_id}`}
           className="text-foreground hover:text-accent transition-colors"
         >
           {shortId(trace.trace_id)}
