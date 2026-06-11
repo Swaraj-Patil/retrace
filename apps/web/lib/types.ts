@@ -132,3 +132,18 @@ export interface MeResponse {
   name: string | null;
   orgs: OrgRef[];
 }
+
+export interface ProjectListItem {
+  id: string;
+  name: string;
+  slug: string;
+  org_id: string;
+  org_name: string;
+  role: string;
+  /** ISO 8601 timestamp. */
+  created_at: string;
+}
+
+export interface ProjectListResponse {
+  projects: ProjectListItem[];
+}

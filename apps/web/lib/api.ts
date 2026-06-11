@@ -26,6 +26,7 @@ import type {
   MeResponse,
   MetricsOverviewResponse,
   MetricsParams,
+  ProjectListResponse,
   SessionTokenResponse,
   TraceDetailResponse,
   TraceListResponse,
@@ -234,4 +235,24 @@ export async function backendMe(token: string): Promise<MeResponse> {
     throw new ApiError(res.status, errorBody);
   }
   return (await res.json()) as MeResponse;
+}
+
+/** Session-only. Returns every project the caller is a member of -
+ *  potentially across multiple orgs. The console endpoint scopes by
+ *  membership, so cross-org rows are never returned. */
+export async function backendListProjects(token: string): Promise<ProjectListResponse> {
+  const res = await fetch(`${apiBaseUrl()}/v1/console/projects`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    let errorBody: unknown = null;
+    try {
+      errorBody = await res.json();
+    } catch {
+      // Non-JSON error body; leave null.
+    }
+    throw new ApiError(res.status, errorBody);
+  }
+  return (await res.json()) as ProjectListResponse;
 }
