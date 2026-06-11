@@ -30,8 +30,22 @@ from api.clickhouse.client import get_client
 from api.db.session import SessionLocal, engine
 from api.dependencies.auth import ProjectContext, get_current_project
 from api.main import app
-from api.models import ApiKey, Membership, MembershipRole, Org, Project, User
-from api.security import generate_api_key
+from api.models import (
+    ApiKey,
+    Membership,
+    MembershipRole,
+    Org,
+    Project,
+    User,
+    UserSession,
+)
+from api.security import (
+    SESSION_TTL,
+    generate_api_key,
+    generate_session_token,
+    hash_password,
+)
+from api.services.auth_rate_limit import reset_login_rate_limit
 
 PROTECTED_TEST_PATH = "/__test_protected__"
 
@@ -233,6 +247,185 @@ async def _teardown_second_test_rows() -> None:
             await session.commit()
     finally:
         await engine.dispose()
+
+
+# Session-auth fixtures
+# ---------------------
+# Two pre-seeded users with known passwords and active session tokens,
+# each in their own org. Used by the auth/console/unified tests. The
+# UUID5 namespace is independent of the api-key fixtures so the row
+# sets never collide. The login rate-limit bucket is reset between
+# tests (autouse) so a noisy test cannot lock out a quiet one.
+_SESSION_TEST_NS = uuid5(NAMESPACE_DNS, "tests.retrace.session")
+SESSION_USER_PASSWORD = "session-test-password-1234"
+
+_SESSION_A_ORG_ID = uuid5(_SESSION_TEST_NS, "a-org")
+_SESSION_A_USER_ID = uuid5(_SESSION_TEST_NS, "a-user")
+SESSION_A_PROJECT_ID = uuid5(_SESSION_TEST_NS, "a-project")
+SESSION_A_EMAIL = f"session-a-{_SESSION_A_USER_ID.hex[:8]}@retrace.test"
+
+_SESSION_B_ORG_ID = uuid5(_SESSION_TEST_NS, "b-org")
+_SESSION_B_USER_ID = uuid5(_SESSION_TEST_NS, "b-user")
+SESSION_B_PROJECT_ID = uuid5(_SESSION_TEST_NS, "b-project")
+SESSION_B_EMAIL = f"session-b-{_SESSION_B_USER_ID.hex[:8]}@retrace.test"
+
+
+class SessionUserFixture:
+    """Bundle returned by the session-user fixtures.
+
+    ``token`` is the raw ``rts_`` session token (Bearer-ready). The
+    other fields are the row ids the fixture seeded, so individual
+    tests can assert against them without re-querying.
+    """
+
+    def __init__(
+        self,
+        *,
+        token: str,
+        email: str,
+        password: str,
+        user_id: UUID,
+        org_id: UUID,
+        project_id: UUID,
+    ) -> None:
+        self.token = token
+        self.email = email
+        self.password = password
+        self.user_id = user_id
+        self.org_id = org_id
+        self.project_id = project_id
+
+
+@pytest.fixture(scope="session")
+def session_user_fixture() -> Iterator[SessionUserFixture]:
+    """Primary session user (A). Owner of one project in one org."""
+    raw_token = asyncio.run(
+        _seed_session_user(
+            user_id=_SESSION_A_USER_ID,
+            email=SESSION_A_EMAIL,
+            org_id=_SESSION_A_ORG_ID,
+            project_id=SESSION_A_PROJECT_ID,
+            tag="a",
+        )
+    )
+    try:
+        yield SessionUserFixture(
+            token=raw_token,
+            email=SESSION_A_EMAIL,
+            password=SESSION_USER_PASSWORD,
+            user_id=_SESSION_A_USER_ID,
+            org_id=_SESSION_A_ORG_ID,
+            project_id=SESSION_A_PROJECT_ID,
+        )
+    finally:
+        asyncio.run(_teardown_session_user(_SESSION_A_USER_ID, _SESSION_A_ORG_ID))
+
+
+@pytest.fixture(scope="session")
+def second_session_user_fixture() -> Iterator[SessionUserFixture]:
+    """Secondary session user (B), in a different org. Used by
+    cross-org tests as the foreign actor / foreign project."""
+    raw_token = asyncio.run(
+        _seed_session_user(
+            user_id=_SESSION_B_USER_ID,
+            email=SESSION_B_EMAIL,
+            org_id=_SESSION_B_ORG_ID,
+            project_id=SESSION_B_PROJECT_ID,
+            tag="b",
+        )
+    )
+    try:
+        yield SessionUserFixture(
+            token=raw_token,
+            email=SESSION_B_EMAIL,
+            password=SESSION_USER_PASSWORD,
+            user_id=_SESSION_B_USER_ID,
+            org_id=_SESSION_B_ORG_ID,
+            project_id=SESSION_B_PROJECT_ID,
+        )
+    finally:
+        asyncio.run(_teardown_session_user(_SESSION_B_USER_ID, _SESSION_B_ORG_ID))
+
+
+async def _seed_session_user(
+    *,
+    user_id: UUID,
+    email: str,
+    org_id: UUID,
+    project_id: UUID,
+    tag: str,
+) -> str:
+    try:
+        async with SessionLocal() as session:
+            # Drop any leftover state from a previously aborted run.
+            await session.execute(delete(Org).where(Org.id == org_id))
+            await session.execute(delete(User).where(User.id == user_id))
+            await session.commit()
+
+            org = Org(
+                id=org_id,
+                name=f"Session Test Org {tag.upper()}",
+                slug=f"session-{tag}-{org_id.hex[:8]}",
+            )
+            user = User(
+                id=user_id,
+                email=email,
+                name=f"Session Test User {tag.upper()}",
+                hashed_password=hash_password(SESSION_USER_PASSWORD),
+            )
+            session.add_all([org, user])
+            await session.flush()
+
+            session.add_all(
+                [
+                    Membership(
+                        org_id=org_id, user_id=user_id, role=MembershipRole.OWNER
+                    ),
+                    Project(
+                        id=project_id,
+                        org_id=org_id,
+                        name=f"Session Test Project {tag.upper()}",
+                        slug=f"session-{tag}-{project_id.hex[:8]}",
+                    ),
+                ]
+            )
+            await session.flush()
+
+            token = generate_session_token()
+            expires_at = datetime.now(UTC) + SESSION_TTL
+            session.add(
+                UserSession(
+                    user_id=user_id,
+                    token_prefix=token.prefix,
+                    hashed_token=token.hashed,
+                    expires_at=expires_at,
+                )
+            )
+            await session.commit()
+            return token.raw
+    finally:
+        await engine.dispose()
+
+
+async def _teardown_session_user(user_id: UUID, org_id: UUID) -> None:
+    try:
+        async with SessionLocal() as session:
+            await session.execute(delete(Org).where(Org.id == org_id))
+            await session.execute(delete(User).where(User.id == user_id))
+            await session.commit()
+    finally:
+        await engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def _reset_login_rate_limit_between_tests() -> Iterator[None]:
+    """Login rate-limit is in-memory and per-process. Reset it between
+    tests so a noisy test (e.g., the 6th-attempt 429 case) cannot
+    affect later tests that happen to use the same (ip, email) bucket.
+    """
+    reset_login_rate_limit()
+    yield
+    reset_login_rate_limit()
 
 
 # Deterministic read-test dataset
