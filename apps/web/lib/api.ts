@@ -22,6 +22,9 @@
 import "server-only";
 
 import type {
+  ApiKeyListResponse,
+  CreateApiKeyResponse,
+  CreateProjectResponse,
   ListTracesParams,
   MeResponse,
   MetricsOverviewResponse,
@@ -255,4 +258,101 @@ export async function backendListProjects(token: string): Promise<ProjectListRes
     throw new ApiError(res.status, errorBody);
   }
   return (await res.json()) as ProjectListResponse;
+}
+
+// ---------------------------------------------------------------------------
+// Console mutations
+//
+// Session-only, like the auth helpers above: they carry the ``rts_``
+// token as the bearer and never touch ``ApiContext`` (no demo-key path
+// reaches the console). Called only from the ``/api/app/*`` route
+// handlers, which read the token from the httpOnly cookie server-side.
+// The per-project endpoints scope by membership on the backend, so an
+// id the caller can't see returns 404 - never cross-org data.
+// ---------------------------------------------------------------------------
+
+async function sessionRequest(
+  token: string,
+  method: string,
+  path: string,
+  body?: object,
+): Promise<Response> {
+  return fetch(`${apiBaseUrl()}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    cache: "no-store",
+  });
+}
+
+async function parseOrThrow<T>(res: Response): Promise<T> {
+  if (!res.ok) {
+    let errorBody: unknown = null;
+    try {
+      errorBody = await res.json();
+    } catch {
+      // Non-JSON error body; leave null.
+    }
+    throw new ApiError(res.status, errorBody);
+  }
+  return (await res.json()) as T;
+}
+
+export async function createProject(
+  token: string,
+  name: string,
+  slug?: string,
+): Promise<CreateProjectResponse> {
+  const res = await sessionRequest(token, "POST", "/v1/console/projects", {
+    name,
+    ...(slug ? { slug } : {}),
+  });
+  return parseOrThrow<CreateProjectResponse>(res);
+}
+
+export async function listApiKeys(
+  token: string,
+  projectId: string,
+): Promise<ApiKeyListResponse> {
+  const res = await sessionRequest(
+    token,
+    "GET",
+    `/v1/console/projects/${encodeURIComponent(projectId)}/keys`,
+  );
+  return parseOrThrow<ApiKeyListResponse>(res);
+}
+
+export async function createApiKey(
+  token: string,
+  projectId: string,
+  name: string,
+): Promise<CreateApiKeyResponse> {
+  const res = await sessionRequest(
+    token,
+    "POST",
+    `/v1/console/projects/${encodeURIComponent(projectId)}/keys`,
+    { name },
+  );
+  return parseOrThrow<CreateApiKeyResponse>(res);
+}
+
+export async function revokeApiKey(
+  token: string,
+  projectId: string,
+  keyId: string,
+): Promise<void> {
+  const res = await sessionRequest(
+    token,
+    "DELETE",
+    `/v1/console/projects/${encodeURIComponent(projectId)}/keys/${encodeURIComponent(keyId)}`,
+  );
+  // 204 expected. The backend treats revocation as idempotent, so an
+  // unknown/already-revoked key in the caller's own project still 204s;
+  // a cross-org id is 404 (indistinguishable from "doesn't exist").
+  if (!res.ok) {
+    throw new ApiError(res.status, null);
+  }
 }

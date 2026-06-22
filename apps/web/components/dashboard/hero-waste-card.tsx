@@ -41,7 +41,7 @@ export function HeroWasteCard({ metrics }: Props) {
         <div>
           <div className="flex items-baseline gap-2 font-mono tabular-nums">
             <span className={cn("text-6xl font-semibold leading-none", hasData ? "text-accent" : "text-muted-foreground")}>
-              {hasData ? `${neverCitedPct}%` : "—"}
+              {hasData ? `${neverCitedPct}%` : "-"}
             </span>
             <span className="text-sm font-medium text-foreground">never cited</span>
           </div>
@@ -54,7 +54,7 @@ export function HeroWasteCard({ metrics }: Props) {
 
         <div className="text-right">
           <div className="flex items-baseline gap-2 font-mono tabular-nums text-muted-foreground">
-            <span className="text-2xl font-medium">{hasData ? `${utilizedPct}%` : "—"}</span>
+            <span className="text-2xl font-medium">{hasData ? `${utilizedPct}%` : "-"}</span>
             <span className="text-xs">utilized</span>
           </div>
         </div>

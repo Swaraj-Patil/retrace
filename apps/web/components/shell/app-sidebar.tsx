@@ -3,7 +3,6 @@ import Link from "next/link";
 import { AppSidebarNav } from "@/components/shell/app-sidebar-nav";
 import { Brand } from "@/components/shell/brand";
 import { ProjectSwitcher } from "@/components/shell/project-switcher";
-import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { UserMenu } from "@/components/shell/user-menu";
 import type { MeResponse, ProjectListItem } from "@/lib/types";
 
@@ -35,9 +34,6 @@ export function AppSidebar({ me, projects, activeProjectId }: Props) {
 
       <div className="border-t border-border">
         <UserMenu email={me.email} name={me.name} />
-        <div className="flex items-center justify-end px-2 pb-2">
-          <ThemeToggle />
-        </div>
       </div>
     </aside>
   );

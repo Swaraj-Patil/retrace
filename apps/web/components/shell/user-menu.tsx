@@ -3,6 +3,7 @@
 import { LogOut } from "lucide-react";
 import { useFormStatus } from "react-dom";
 
+import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { logoutAction } from "@/lib/actions/auth";
 import { cn } from "@/lib/utils";
 
@@ -20,20 +21,20 @@ function LogoutButton() {
       aria-label="Log out"
       title={pending ? "Logging out..." : "Log out"}
       className={cn(
-        "rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
+        "flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         "disabled:opacity-50",
       )}
     >
-      <LogOut className="h-3.5 w-3.5" />
+      <LogOut className="h-4 w-4" />
     </button>
   );
 }
 
-/** Footer row: caller's identity + a logout button bound to the
- *  ``logoutAction`` server action. The form-action pattern means
- *  logout works even with JS disabled (the action handles the
- *  cookie clear + redirect server-side). */
+/** Single footer row: caller's identity on the left, theme toggle and
+ *  logout grouped on the right. The logout form-action pattern means
+ *  logout works even with JS disabled (the action handles the cookie
+ *  clear + redirect server-side); the theme toggle is purely client. */
 export function UserMenu({ email, name }: Props) {
   return (
     <div className="flex items-center justify-between gap-2 px-2 py-1.5">
@@ -53,9 +54,12 @@ export function UserMenu({ email, name }: Props) {
           {email}
         </span>
       </div>
-      <form action={logoutAction}>
-        <LogoutButton />
-      </form>
+      <div className="flex shrink-0 items-center gap-0.5">
+        <ThemeToggle />
+        <form action={logoutAction}>
+          <LogoutButton />
+        </form>
+      </div>
     </div>
   );
 }

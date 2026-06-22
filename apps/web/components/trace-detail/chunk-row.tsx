@@ -74,7 +74,7 @@ export function ChunkRow({ chunk }: { chunk: ChunkDetail }) {
           </button>
 
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] text-muted-foreground">
-            <span className="text-foreground/80">{chunk.source_doc_id || "—"}</span>
+            <span className="text-foreground/80">{chunk.source_doc_id || "-"}</span>
             {metaTags.length > 0 && <Sep />}
             {metaTags.map((m, i) => (
               <React.Fragment key={i}>

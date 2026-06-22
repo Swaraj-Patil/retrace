@@ -10,6 +10,12 @@ export function absoluteTime(iso: string): string {
   return format(parseISO(iso), "yyyy-MM-dd HH:mm:ss 'UTC'");
 }
 
+/** Date only, e.g. ``Jun 21, 2026``. Used for created/revoked stamps
+ *  in the console where time-of-day is noise. */
+export function dateOnly(iso: string): string {
+  return format(parseISO(iso), "MMM d, yyyy");
+}
+
 export function formatMs(ms: number): string {
   if (ms < 1000) return `${ms} ms`;
   return `${(ms / 1000).toFixed(2)} s`;

@@ -147,3 +147,39 @@ export interface ProjectListItem {
 export interface ProjectListResponse {
   projects: ProjectListItem[];
 }
+
+/** Returned from ``POST /v1/console/projects``. Narrower than
+ *  {@link ProjectListItem} - no ``org_name``/``role``, since the
+ *  creator is always the org owner of a freshly created project. */
+export interface CreateProjectResponse {
+  id: string;
+  name: string;
+  slug: string;
+  org_id: string;
+  created_at: string;
+}
+
+export interface ApiKeyListItem {
+  id: string;
+  name: string;
+  /** The non-secret 11-char prefix (``rt_`` + 8). Safe to render. */
+  key_prefix: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+}
+
+export interface ApiKeyListResponse {
+  keys: ApiKeyListItem[];
+}
+
+/** Returned from ``POST /v1/console/projects/{id}/keys`` exactly once.
+ *  ``raw_key`` is the full secret - it never appears in any other
+ *  response, so the UI must surface it now or force a regenerate. */
+export interface CreateApiKeyResponse {
+  id: string;
+  name: string;
+  key_prefix: string;
+  raw_key: string;
+  created_at: string;
+}
